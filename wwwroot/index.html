@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Leitor de Arquivos</title>
+  <style>
+    :root {
+      --bg: #eef2f7;
+      --card: #ffffff;
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --success: #16a34a;
+      --danger: #dc2626;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: linear-gradient(135deg, #e0e7ff 0%, #fdf2f8 50%, #e0f2fe 100%);
+    }
+
+    .card {
+      width: 100%;
+      max-width: 680px;
+      background: var(--card);
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(17, 24, 39, 0.12);
+      padding: 2.25rem;
+    }
+
+    .card h1 {
+      margin: 0 0 0.4rem;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card .subtitle {
+      margin: 0 0 1.75rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background-color .2s;
+      display: block;
+      width: 100%
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: #f5f7ff;
+    }
+
+    .dropzone .icon { font-size: 2.25rem; }
+    .dropzone p { margin: 0.5rem 0 0; color: var(--muted); font-size: 0.9rem; }
+    .dropzone .browse { color: var(--primary); font-weight: 600; }
+
+    input[type="file"] { display: none; }
+
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 0.7rem 1.4rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color .2s, opacity .2s;
+    }
+
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #uploadBtn { background: var(--primary); color: #fff; }
+    #uploadBtn:hover:not(:disabled) { background: var(--primary-dark); }
+
+    #clearBtn { background: #f3f4f6; color: var(--text); }
+    #clearBtn:hover:not(:disabled) { background: #e5e7eb; }
+
+    .status { font-size: 0.9rem; margin-left: auto; }
+    .status.ok { color: var(--success); }
+    .status.err { color: var(--danger); }
+
+    .summary {
+      margin-top: 1.25rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .table-wrap { margin-top: 1.5rem; overflow-x: auto; }
+
+    .count { font-weight: 600; margin: 0 0 0.5rem; }
+
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 0.55rem 0.7rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: .04em; }
+    tr:last-child td { border-bottom: none; }
+
+    .badge {
+      display: inline-block;
+      background: #eef2ff;
+      color: var(--primary-dark);
+      border-radius: 999px;
+      padding: 0.15rem 0.55rem;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>&#128193; Leitor de Arquivos</h1>
+    <p class="subtitle">Selecione um ou mais arquivos e envie para o servidor.</p>
+
+    <label class="dropzone" id="dropzone" for="files">
+      <div class="icon">&#128228;</div>
+      <p>Arraste e solte os arquivos aqui ou <span class="browse">procure no computador</span></p>
+    </label>
+    <input type="file" id="files" multiple />
+
+    <div class="actions">
+      <button id="uploadBtn" disabled>Enviar</button>
+      <button id="clearBtn" disabled>Limpar</button>
+      <span class="status" id="status"></span>
+    </div>
+
+    <div class="summary" id="summary"></div>
+    <div class="table-wrap" id="info"></div>
+  </div>
+
+  <script>
+    const input = document.getElementById('files');
+    const dropzone = document.getElementById('dropzone');
+    const info = document.getElementById('info');
+    const summary = document.getElementById('summary');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const status = document.getElementById('status');
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const units = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+    }
+
+    function selectionSummary() {
+      const count = input.files.length;
+      summary.textContent = count > 0
+        ? count + ' arquivo(s) selecionado(s) — pronto(s) para envio.'
+        : '';
+    }
+
+    function renderUploaded(files) {
+      if (!files || files.length === 0) {
+        info.innerHTML = '';
+        return;
+      }
+
+      const rows = files.map((file, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${file.name}</td>
+          <td>${formatBytes(file.size)}</td>
+          <td>${file.type ? `<span class="badge">${file.type}</span>` : '<span class="badge">—</span>'}</td>
+          <td>${new Date(file.lastModified).toLocaleString()}</td>
+        </tr>
+      `).join('');
+
+      info.innerHTML = `
+        <p class="count">${files.length} arquivo(s) processado(s)</p>
+        <table>
+          <thead>
+            <tr><th>#</th><th>Nome</th><th>Tamanho</th><th>Tipo</th><th>Modificado</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function setStatus(message, type) {
+      status.textContent = message;
+      status.className = 'status ' + (type || '');
+      if (message) clearTimeout(setStatus._t);
+      setStatus._t = setTimeout(() => { status.textContent = ''; status.className = 'status'; }, 6000);
+    }
+
+    function onFilesChanged() {
+      setStatus('');
+      uploadBtn.disabled = input.files.length === 0;
+      clearBtn.disabled = input.files.length === 0;
+      selectionSummary();
+      info.innerHTML = '';
+    }
+
+    input.addEventListener('change', () => {
+      onFilesChanged();
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) {
+        input.files = e.dataTransfer.files;
+        onFilesChanged();
+      }
+    });
+
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      summary.textContent = '';
+      info.innerHTML = '';
+      setStatus('');
+      uploadBtn.disabled = true;
+      clearBtn.disabled = true;
+    });
+
+    uploadBtn.addEventListener('click', async () => {
+      const files = Array.from(input.files);
+      if (files.length === 0) return;
+
+      const formData = new FormData();
+      files.forEach((file) => formData.append('files', file));
+
+      uploadBtn.disabled = true;
+      setStatus('Enviando...');
+
+      try {
+          const response = await fetch('/MultipleFileReader/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error('Erro ' + response.status);
+        }
+
+        const data = await response.text();
+        setStatus(data || 'Envio concluído com sucesso!', 'ok');
+        renderUploaded(files);
+      } catch (err) {
+        setStatus('Falha no envio: ' + err.message, 'err');
+      } finally {
+        uploadBtn.disabled = input.files.length === 0;
+        selectionSummary();
+      }
+    });
+  </script>
+</body>
+</html>
