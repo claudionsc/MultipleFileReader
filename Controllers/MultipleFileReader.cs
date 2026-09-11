@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using MultipleFileReader.Interface;
 
 namespace MultipleFileReader.Controllers;
 
@@ -6,6 +7,11 @@ namespace MultipleFileReader.Controllers;
 [Route("[controller]")]
 public class MultipleFileReaderController : ControllerBase
 {
+    private readonly IFileServices _file;
+    public MultipleFileReaderController(IFileServices file)
+    {
+        _file = file;
+    }
 
     [Consumes("multipart/form-data")]
     [HttpPost("upload")]
@@ -15,6 +21,8 @@ public class MultipleFileReaderController : ControllerBase
         {
             return BadRequest("No files were uploaded.");
         }
+
+        _file.ReadFileAsync(files);
         
         return Ok("File uploaded successfully.");
     }
