@@ -2,6 +2,7 @@
 {
     public interface IFileServices
     {
-        public IAsyncEnumerable<FileModel> ReadFileAsync(List<IFormFile> files);
+        IEnumerable<FileModel> ReadFilesAConcurrent(List<IFormFile> files);
+        IEnumerable<FileModel> ReadFile(List<IFormFile> files);
     }
 }

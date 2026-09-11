@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using MultipleFileReader.Interface;
+using System.Diagnostics;
 
 namespace MultipleFileReader.Controllers;
 
@@ -19,11 +20,34 @@ public class MultipleFileReaderController : ControllerBase
     {
         if (files == null || !files.Any())
         {
-            return BadRequest("No files were uploaded.");
+            return BadRequest("Nenhum arquivo enviado.");
         }
 
-        _file.ReadFileAsync(files);
-        
-        return Ok("File uploaded successfully.");
+        var sw = Stopwatch.StartNew();
+        var fileModels = _file.ReadFile(files);
+        sw.Stop();
+
+        Console.WriteLine($"Processamento sequencial (CPU-bound): {sw.ElapsedMilliseconds} ms");
+
+        return Ok(fileModels);
+    }
+
+    [Consumes("multipart/form-data")]
+    [HttpPost("upload-parallel")]
+    public ActionResult UploadFilesParallel([FromForm] List<IFormFile> files)
+    {
+        if (files == null || !files.Any())
+        {
+            return BadRequest("Nenhum arquivo enviado.");
+
+        }
+
+        var sw = Stopwatch.StartNew();
+        var fileModels = _file.ReadFilesAConcurrent(files);
+        sw.Stop();
+
+        Console.WriteLine($"Processamento paralelo (CPU-bound): {sw.ElapsedMilliseconds} ms");
+
+        return Ok(fileModels);
     }
 }

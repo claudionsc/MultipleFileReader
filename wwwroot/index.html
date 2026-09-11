@@ -99,6 +99,9 @@
     #uploadBtn { background: var(--primary); color: #fff; }
     #uploadBtn:hover:not(:disabled) { background: var(--primary-dark); }
 
+    #uploadParallelBtn { background: #0d9488; color: #fff; }
+    #uploadParallelBtn:hover:not(:disabled) { background: #0f766e; }
+
     #clearBtn { background: #f3f4f6; color: var(--text); }
     #clearBtn:hover:not(:disabled) { background: #e5e7eb; }
 
@@ -144,6 +147,7 @@
 
     <div class="actions">
       <button id="uploadBtn" disabled>Enviar</button>
+      <button id="uploadParallelBtn" disabled>Enviar em paralelo</button>
       <button id="clearBtn" disabled>Limpar</button>
       <span class="status" id="status"></span>
     </div>
@@ -158,6 +162,7 @@
     const info = document.getElementById('info');
     const summary = document.getElementById('summary');
     const uploadBtn = document.getElementById('uploadBtn');
+    const uploadParallelBtn = document.getElementById('uploadParallelBtn');
     const clearBtn = document.getElementById('clearBtn');
     const status = document.getElementById('status');
 
@@ -175,24 +180,24 @@
         : '';
     }
 
-    function renderUploaded(files) {
-      if (!files || files.length === 0) {
+    function renderUploaded(models) {
+      if (!models || models.length === 0) {
         info.innerHTML = '';
         return;
       }
 
-      const rows = files.map((file, index) => `
+      const rows = models.map((m, index) => `
         <tr>
           <td>${index + 1}</td>
-          <td>${file.name}</td>
-          <td>${formatBytes(file.size)}</td>
-          <td>${file.type ? `<span class="badge">${file.type}</span>` : '<span class="badge">—</span>'}</td>
-          <td>${new Date(file.lastModified).toLocaleString()}</td>
+          <td>${m.name}</td>
+          <td>${m.size}</td>
+          <td>${m.type ? `<span class="badge">${m.type}</span>` : '<span class="badge">—</span>'}</td>
+          <td>${m.modified}</td>
         </tr>
       `).join('');
 
       info.innerHTML = `
-        <p class="count">${files.length} arquivo(s) processado(s)</p>
+        <p class="count">${models.length} arquivo(s) processado(s)</p>
         <table>
           <thead>
             <tr><th>#</th><th>Nome</th><th>Tamanho</th><th>Tipo</th><th>Modificado</th></tr>
@@ -212,6 +217,7 @@
     function onFilesChanged() {
       setStatus('');
       uploadBtn.disabled = input.files.length === 0;
+      uploadParallelBtn.disabled = input.files.length === 0;
       clearBtn.disabled = input.files.length === 0;
       selectionSummary();
       info.innerHTML = '';
@@ -245,10 +251,11 @@
       info.innerHTML = '';
       setStatus('');
       uploadBtn.disabled = true;
+      uploadParallelBtn.disabled = true;
       clearBtn.disabled = true;
     });
 
-    uploadBtn.addEventListener('click', async () => {
+    async function upload(endpoint) {
       const files = Array.from(input.files);
       if (files.length === 0) return;
 
@@ -256,10 +263,12 @@
       files.forEach((file) => formData.append('files', file));
 
       uploadBtn.disabled = true;
+      uploadParallelBtn.disabled = true;
+      clearBtn.disabled = true;
       setStatus('Enviando...');
 
       try {
-          const response = await fetch('/MultipleFileReader/upload', {
+        const response = await fetch(endpoint, {
           method: 'POST',
           body: formData
         });
@@ -268,16 +277,21 @@
           throw new Error('Erro ' + response.status);
         }
 
-        const data = await response.text();
-        setStatus(data || 'Envio concluído com sucesso!', 'ok');
-        renderUploaded(files);
+        const data = await response.json();
+        setStatus('Envio concluído com sucesso!', 'ok');
+        renderUploaded(data);
       } catch (err) {
         setStatus('Falha no envio: ' + err.message, 'err');
       } finally {
         uploadBtn.disabled = input.files.length === 0;
+        uploadParallelBtn.disabled = input.files.length === 0;
+        clearBtn.disabled = input.files.length === 0;
         selectionSummary();
       }
-    });
+    }
+
+    uploadBtn.addEventListener('click', () => upload('/MultipleFileReader/upload'));
+    uploadParallelBtn.addEventListener('click', () => upload('/MultipleFileReader/upload-parallel'));
   </script>
 </body>
 </html>
